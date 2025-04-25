@@ -69,6 +69,8 @@ function M.start(modules)
             :WaitForChild("SurfaceGui")
             :WaitForChild(isLocalWhite and "WhiteTime" or "BlackTime")
 
+        -- wait for clock to initialize
+        task.wait(0.1)
         clockText = clockLabel.ContentText
         randWaitFromGameType = getSmartWait(clockText, nbMoves)
         boardLoaded = true
