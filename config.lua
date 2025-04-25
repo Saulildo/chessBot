@@ -31,3 +31,5 @@ config.COLORS = {
         icon = Color3.fromRGB(255, 170, 0)
     }
 }
+
+return config

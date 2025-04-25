@@ -30,6 +30,7 @@ function M.init(modules)
     local aiFrame = Instance.new("Frame")
     aiFrame.Name = "aiFrame"
     aiFrame.Size = UDim2.new(1, 0, 0.045, 0) -- Scaled size
+    print(config)
     aiFrame.BackgroundColor3 = config.COLORS.off.background
     aiFrame.LayoutOrder = 99
     aiFrame.Parent = sideFrame
