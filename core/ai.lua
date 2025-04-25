@@ -15,24 +15,6 @@ function M.start(modules)
     local Sunfish = localPlayer:WaitForChild("PlayerScripts").AI:WaitForChild("Sunfish")
     local ChessLocalUI = localPlayer:WaitForChild("PlayerScripts"):WaitForChild("ChessLocalUI")
 
-    -- get ai bestmove function in Sunfish module script from garbage collector
-    local GetBestMove = nil
-    for _, f in ipairs(getgc(true)) do
-        if typeof(f) == "function" and debug.getinfo(f).name == "GetBestMove" then
-            if(string.sub(debug.getinfo(f).source, -7)=="Sunfish") then
-                GetBestMove = f
-            end
-        end
-    end
-
-    -- get playmove function in ChessLocalUI from garbage collector
-    local PlayMove = nil
-    for _, f in ipairs(getgc(true)) do
-        if typeof(f) == "function" and debug.getinfo(f).name == "PlayMove" then
-            PlayMove = f
-        end
-    end
-
     local function getGameType(clockText)
         return config.CLOCK_NAME_MAPPING[clockText] or "unknown"
     end
@@ -53,8 +35,59 @@ function M.start(modules)
         end
     end
 
+    local function getFunction(funcName, moduleName)
+        local retryCount = 0
+        local func = nil
+    
+        while retryCount < 10 and not func do
+            for _, f in ipairs(getgc(true)) do
+                if typeof(f) == "function" and debug.getinfo(f).name == funcName then
+                    if string.sub(debug.getinfo(f).source, -#moduleName) == moduleName then
+                        func = f
+                        break
+                    end
+                end
+            end
+            if not func then
+                retryCount = retryCount + 1
+                task.wait(0.1)
+            end
+        end
+    
+        if not func then
+            warn("Failed to find " .. funcName .. " after 10 retries.")
+        end
+        return func
+    end
+
+    local function initializeFunctions()
+        local GetBestMove = waitForFunction("GetBestMove", "Sunfish")
+        local PlayMove = waitForFunction("PlayMove", "ChessLocalUI")
+    
+        return GetBestMove, PlayMove
+    end
+
+    --[[ get ai bestmove function in Sunfish module script from garbage collector
+    local GetBestMove = nil
+    for _, f in ipairs(getgc(true)) do
+        if typeof(f) == "function" and debug.getinfo(f).name == "GetBestMove" then
+            if(string.sub(debug.getinfo(f).source, -7)=="Sunfish") then
+                GetBestMove = f
+            end
+        end
+    end
+
+    -- get playmove function in ChessLocalUI from garbage collector
+    local PlayMove = nil
+    for _, f in ipairs(getgc(true)) do
+        if typeof(f) == "function" and debug.getinfo(f).name == "PlayMove" then
+            PlayMove = f
+        end
+    end]]
+
     -- Main part
     local function startGameHandler(board)
+        local GetBestMove, PlayMove = initializeFunctions()
         local boardLoaded = false
         local Fen = nil
         local move = nil
@@ -90,11 +123,7 @@ function M.start(modules)
                     Fen = board.FEN.Value
 
                     if isLocalPlayersTurn() and Fen and state.aiRunning then 
-                        if GetBestMove ~= nil then
-                            move = GetBestMove(nil, Fen, 5000) 
-                        else
-                            print("retard")
-                        end
+                        move = GetBestMove(nil, Fen, 5000)
                         if move then
                             task.wait(randWaitFromGameType)
                             PlayMove(move)
