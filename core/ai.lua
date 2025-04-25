@@ -61,8 +61,8 @@ function M.start(modules)
     end
 
     local function initializeFunctions()
-        local GetBestMove = waitForFunction("GetBestMove", "Sunfish")
-        local PlayMove = waitForFunction("PlayMove", "ChessLocalUI")
+        local GetBestMove = getFunction("GetBestMove", "Sunfish")
+        local PlayMove = getFunction("PlayMove", "ChessLocalUI")
     
         return GetBestMove, PlayMove
     end
