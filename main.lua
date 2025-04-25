@@ -1,4 +1,3 @@
-return { 
 local modules = {}
 
 if _G.__CHESS_AI_LOADED__FULL then
@@ -13,4 +12,3 @@ modules.ai = loadstring(game:HttpGet("https://raw.githubusercontent.com/SchizoCo
 modules.gui = loadstring(game:HttpGet("https://raw.githubusercontent.com/SchizoCore/chessBot/main/core/gui.lua"))()
 
 modules.gui.init(modules)
-}

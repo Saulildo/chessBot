@@ -115,8 +115,7 @@ function M.init(modules)
             end
         end
     end)
+    print("[LOG]: GUI loaded.")
 end
-
-print("GUI loaded.")
 
 return M
