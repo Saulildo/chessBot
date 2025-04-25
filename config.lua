@@ -3,7 +3,7 @@ local config = {}
 -- Clock to wait-time ranges
 config.CLOCK_WAIT_MAPPING = {
     ["∞"] = {min = 4, max = 7},
-    ["1:00"] = {min = 1, max = 2},
+    ["1:00"] = {min = 0, max = 1},
     ["3:00"] = {min = 2, max = 3},
     ["10:00"] = {min = 4, max = 7},
 }
