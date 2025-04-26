@@ -21,7 +21,9 @@ function M.start(modules)
 
     local function getSmartWait(clockText, moveCount)
         local configRange = config.CLOCK_WAIT_MAPPING[clockText]
-        if not configRange then error("Invalid clock: " .. tostring(clockText)) end
+        if not configRange then 
+            configRange = config.CLOCK_WAIT_MAPPING["bullet"] -- temporary fix
+        end
     
         local baseWait = math.random(math.random(0, configRange.min), math.random(configRange.min, configRange.max))
         local gameType = getGameType(clockText)
