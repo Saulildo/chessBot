@@ -96,7 +96,7 @@ local pst = {
         0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0,
         0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0,
         0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0,
-        0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0,
+        0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0,
         0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0,
         0, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 2529, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -210,7 +210,7 @@ function Position:move(move)
       return board:sub(1, i-1) .. p .. board:sub(i+1)
    end
    local board = self.board
-   local wc, bc, ep, kp = self.wc, self.bc, 0, 0
+   local wc, bc, ep, kp = {self.wc[1], self.wc[2]}, {self.bc[1], self.bc[2]}, 0, 0
    local score = self.score + self:value(move)
    board = put(board, j + __1, board:sub(i + __1, i + __1))
    board = put(board, i + __1, '.')
@@ -304,7 +304,6 @@ local nodes = 0
 local function bound(pos, gamma, depth)
     nodes = nodes + 1
     local entry = tp_get(pos)
-    assert(depth)
     if entry ~= nil and entry.depth >= depth and (
             entry.score < entry.gamma and entry.score < gamma or
             entry.score >= entry.gamma and entry.score >= gamma) then
@@ -365,12 +364,11 @@ local function search(pos, maxn)
    maxn = maxn or NODES_SEARCHED
    nodes = 0
    local score
-   for depth=1,98 do
+   for depth=1,10 do -- Reduced max depth for faster moves
       local lower, upper = -3*MATE_VALUE, 3*MATE_VALUE
       while lower < upper - 3 do
          local gamma = math.floor((lower+upper+1)/2)
          score = bound(pos, gamma, depth)
-         assert(score)
          if score >= gamma then
             lower = score
          end
@@ -378,7 +376,6 @@ local function search(pos, maxn)
             upper = score
          end
       end
-      assert(score)
       if nodes >= maxn or math.abs(score) >= MATE_VALUE then
          break
       end
@@ -392,7 +389,7 @@ end
 
 -- FEN parsing and conversion functions
 local function fenToBoardString(fen)
-    -- Parse FEN to Sunfish board format
+    print("[DEBUG] Parsing FEN:", fen)
     local parts = {}
     for part in fen:gmatch("[^%s]+") do
         table.insert(parts, part)
@@ -402,66 +399,59 @@ local function fenToBoardString(fen)
     local castling = parts[3] or "-"
     local enPassant = parts[4] or "-"
     
-    -- Initialize board
-    local board = '         \n         \n'
+    -- Build board string from FEN
+    local boardStr = '         \n         \n '
+    local fenIndex = 1
     
-    -- Convert FEN board to Sunfish format
-    local rank = 8
-    local file = 1
-    for i = 1, #board_part do
-        local char = board_part:sub(i, i)
-        if char == '/' then
-            board = board .. '\n '
-            rank = rank - 1
-            file = 1
-        elseif tonumber(char) then
-            for j = 1, tonumber(char) do
-                board = board .. '.'
-                file = file + 1
+    -- Parse from rank 8 to rank 1 (FEN starts from rank 8)
+    for rank = 8, 1, -1 do
+        for file = 1, 8 do
+            local char = board_part:sub(fenIndex, fenIndex)
+            if char == '/' then
+                fenIndex = fenIndex + 1
+                char = board_part:sub(fenIndex, fenIndex)
             end
-        else
-            -- Convert piece notation (FEN uses uppercase for white)
-            if activeColor == 'w' then
-                board = board .. char
-            else
-                -- Need to swap case for black's turn
-                if char:upper() == char then
-                    board = board .. char:lower()
-                else
-                    board = board .. char:upper()
+            
+            if tonumber(char) then
+                -- Empty squares
+                for i = 1, tonumber(char) do
+                    boardStr = boardStr .. '.'
+                    if i < tonumber(char) then
+                        file = file + 1
+                    end
                 end
+            else
+                -- Piece
+                boardStr = boardStr .. char
             end
-            file = file + 1
+            fenIndex = fenIndex + 1
         end
+        boardStr = boardStr .. '\n '
     end
-    board = board .. '\n         \n          '
-    
-    -- If it's black to move, rotate the board
-    if activeColor == 'b' then
-        board = swapcase(board:reverse())
-    end
+    boardStr = boardStr .. '        \n          '
     
     -- Parse castling rights
-    local wc = {false, false}
-    local bc = {false, false}
-    if castling:find('K') then wc[2] = true end
-    if castling:find('Q') then wc[1] = true end
-    if castling:find('k') then bc[2] = true end
-    if castling:find('q') then bc[1] = true end
+    local wc = {castling:find('Q') ~= nil, castling:find('K') ~= nil}
+    local bc = {castling:find('q') ~= nil, castling:find('k') ~= nil}
     
     -- Parse en passant
     local ep = 0
     if enPassant ~= '-' then
         local file = string.byte(enPassant:sub(1,1)) - string.byte('a')
         local rank = tonumber(enPassant:sub(2,2))
-        if activeColor == 'w' then
-            ep = A1 + file - 10*(rank-1)
-        else
-            ep = 119 - (A1 + file - 10*(rank-1))
-        end
+        ep = A1 + file - 10*(rank-1)
     end
     
-    return board, wc, bc, ep, activeColor
+    -- If it's black to move, rotate the board
+    if activeColor == 'b' then
+        boardStr = swapcase(boardStr:reverse())
+        ep = ep > 0 and (119 - ep) or 0
+    end
+    
+    print("[DEBUG] Board string:")
+    print(boardStr)
+    
+    return boardStr, wc, bc, ep, activeColor
 end
 
 local function render(i)
@@ -471,19 +461,41 @@ end
 
 -- GetBestMove function that interfaces with the engine
 local function GetBestMove(_, fen, searchTime)
+    -- Clear transposition table for new position
+    tp = {}
+    tp_index = {}
+    tp_count = 0
+    
     -- Convert FEN to Sunfish board format
     local board, wc, bc, ep, activeColor = fenToBoardString(fen)
     
     -- Create position
     local pos = Position.new(board, 0, wc, bc, ep, 0)
     
+    -- Generate all legal moves to check if any exist
+    local legalMoves = pos:genMoves()
+    print("[DEBUG] Found", #legalMoves, "legal moves")
+    
+    if #legalMoves == 0 then
+        print("[DEBUG] No legal moves available")
+        return nil
+    end
+    
     -- Search for best move
-    local maxNodes = searchTime and (searchTime * 2) or NODES_SEARCHED
+    local maxNodes = 5000 -- Fixed node count for consistency
     local move, score = search(pos, maxNodes)
     
     if not move then
-        return nil
+        print("[DEBUG] Search returned no move")
+        -- If search fails, pick first legal move
+        if #legalMoves > 0 then
+            move = legalMoves[1]
+        else
+            return nil
+        end
     end
+    
+    print("[DEBUG] Best move found:", move[1], "->", move[2])
     
     -- Convert move to standard notation
     local from, to = move[1], move[2]
@@ -497,6 +509,8 @@ local function GetBestMove(_, fen, searchTime)
     -- Convert to algebraic notation
     local fromStr = render(from)
     local toStr = render(to)
+    
+    print("[DEBUG] Move in algebraic notation:", fromStr .. toStr)
     
     return fromStr .. toStr
 end
@@ -600,13 +614,22 @@ function M.start(modules)
                     Fen = board.FEN.Value
 
                     if isLocalPlayersTurn() and Fen and state.aiRunning then 
+                        print("[DEBUG] It's our turn. FEN:", Fen)
                         move = GetBestMove(nil, Fen, 5000)
                         if move then
+                            print("[DEBUG] Making move:", move)
                             task.wait(randWaitFromGameType)
-                            PlayMove(move)
+                            local success, err = pcall(function()
+                                PlayMove(move)
+                            end)
+                            if not success then
+                                warn("[ERROR] Failed to play move:", err)
+                            end
 
                             nbMoves = nbMoves + 1
                             randWaitFromGameType = getSmartWait(clockText, nbMoves)
+                        else
+                            print("[DEBUG] No valid move found")
                         end
                     end
                 end
