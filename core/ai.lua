@@ -17,6 +17,11 @@ function M.start(modules)
 
     -- Stockfish server configuration
     local STOCKFISH_URL = "http://localhost:8080"
+    
+    -- Pondering state
+    local isPondering = false
+    local ponderMove = nil
+    local lastPosition = nil
 
     -- Parse clock text to milliseconds
     local function parseTimeControl(clockText)
@@ -31,10 +36,56 @@ function M.start(modules)
         return 180000 -- Default 3 minutes
     end
 
+    -- Start pondering
+    local function startPonder(fen, expectedMove)
+        if not expectedMove then return end
+        
+        isPondering = true
+        
+        -- Make the expected move on the position
+        local ponderFen = fen -- This would need move application logic
+        
+        spawn(function()
+            local response = request({
+                Url = STOCKFISH_URL .. "/ponder",
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = game:GetService("HttpService"):JSONEncode({
+                    fen = fen,
+                    move = expectedMove
+                })
+            })
+            
+            if response.Success then
+                local data = game:GetService("HttpService"):JSONDecode(response.Body)
+                if gui.updateAnalysis then
+                    data.analysis.pondering = true
+                    gui.updateAnalysis(data.analysis)
+                end
+            end
+        end)
+    end
+
+    -- Stop pondering
+    local function stopPonder()
+        if isPondering then
+            isPondering = false
+            request({
+                Url = STOCKFISH_URL .. "/stop",
+                Method = "POST"
+            })
+        end
+    end
+
     -- Get best move from Stockfish server with analysis
-    local function getStockfishMove(fen, whiteTime, blackTime, whiteToMove)
+    local function getStockfishMove(fen, whiteTime, blackTime, whiteToMove, usePonder)
+        stopPonder() -- Stop any ongoing ponder
+        
+        local endpoint = usePonder and "/ponderhit" or "/analyze"
         local response = request({
-            Url = STOCKFISH_URL .. "/analyze",
+            Url = STOCKFISH_URL .. endpoint,
             Method = "POST",
             Headers = {
                 ["Content-Type"] = "application/json"
@@ -52,8 +103,12 @@ function M.start(modules)
             
             -- Update GUI with analysis data
             if data.analysis and gui.updateAnalysis then
+                data.analysis.pondering = false
                 gui.updateAnalysis(data.analysis)
             end
+            
+            -- Store ponder move if available
+            ponderMove = data.ponder
             
             return data.bestmove
         else
@@ -121,21 +176,60 @@ function M.start(modules)
             while not gameEnded do
                 if boardLoaded and board then
                     Fen = board.FEN.Value
-
-                    if isLocalPlayersTurn() and Fen and state.aiRunning then 
-                        -- Get current times
-                        local whiteTime = parseTimeControl(whiteTimeLabel.ContentText)
-                        local blackTime = parseTimeControl(blackTimeLabel.ContentText)
+                    
+                    -- Check if position changed (opponent moved)
+                    if Fen ~= lastPosition then
+                        lastPosition = Fen
                         
-                        local success, result = pcall(function()
-                            return getStockfishMove(Fen, whiteTime, blackTime, board.WhiteToPlay.Value)
-                        end)
-                        
-                        if success and result then
-                            move = result
-                            PlayMove(move) -- Play immediately
-                        elseif not success then
-                            warn("Error getting move:", result)
+                        if isLocalPlayersTurn() and state.aiRunning then 
+                            -- Our turn - make a move
+                            local whiteTime = parseTimeControl(whiteTimeLabel.ContentText)
+                            local blackTime = parseTimeControl(blackTimeLabel.ContentText)
+                            
+                            -- Check if we predicted this position
+                            local usePonder = isPondering and ponderMove
+                            
+                            local success, result = pcall(function()
+                                return getStockfishMove(Fen, whiteTime, blackTime, board.WhiteToPlay.Value, usePonder)
+                            end)
+                            
+                            if success and result then
+                                move = result
+                                PlayMove(move)
+                                
+                                -- Start pondering for opponent's move
+                                if ponderMove then
+                                    startPonder(Fen, ponderMove)
+                                end
+                            elseif not success then
+                                warn("Error getting move:", result)
+                            end
+                        elseif not isLocalPlayersTurn() and state.aiRunning then
+                            -- Opponent's turn - start pondering
+                            spawn(function()
+                                wait(0.5) -- Small delay to ensure position is stable
+                                if not isLocalPlayersTurn() then
+                                    -- Get a preliminary analysis
+                                    local response = request({
+                                        Url = STOCKFISH_URL .. "/quickanalysis",
+                                        Method = "POST",
+                                        Headers = {
+                                            ["Content-Type"] = "application/json"
+                                        },
+                                        Body = game:GetService("HttpService"):JSONEncode({
+                                            fen = Fen,
+                                            depth = 10
+                                        })
+                                    })
+                                    
+                                    if response.Success then
+                                        local data = game:GetService("HttpService"):JSONDecode(response.Body)
+                                        if data.bestmove then
+                                            startPonder(Fen, data.bestmove)
+                                        end
+                                    end
+                                end
+                            end)
                         end
                     end
                 end
@@ -149,6 +243,7 @@ function M.start(modules)
         ReplicatedStorage.Chess:WaitForChild("EndGameEvent").OnClientEvent:Once(function(board)
                 gameEnded = true
                 state.gameConnected = false
+                stopPonder()
                 print("[LOG]: Game ended.")
         end)
     end
