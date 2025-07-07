@@ -5,7 +5,6 @@ function M.start(modules)
     local state = modules.state
     local gui = modules.gui
 
-    -- Start new instance
     state.aiLoaded = true
     state.aiRunning = true
     state.gameConnected = false
@@ -15,35 +14,30 @@ function M.start(modules)
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local ChessLocalUI = localPlayer:WaitForChild("PlayerScripts"):WaitForChild("ChessLocalUI")
 
-    -- Stockfish server configuration
     local STOCKFISH_URL = "http://localhost:8080"
     
-    -- Pondering state
     local isPondering = false
     local ponderMove = nil
     local lastPosition = nil
+    local analysisId = nil
 
-    -- Parse clock text to milliseconds
     local function parseTimeControl(clockText)
         if clockText == "∞" then
-            return nil -- No time limit
+            return nil
         end
         
         local minutes, seconds = clockText:match("(%d+):(%d+)")
         if minutes and seconds then
             return (tonumber(minutes) * 60 + tonumber(seconds)) * 1000
         end
-        return 180000 -- Default 3 minutes
+        return 180000
     end
 
-    -- Start pondering
     local function startPonder(fen, expectedMove)
         if not expectedMove then return end
         
         isPondering = true
-        
-        -- Make the expected move on the position
-        local ponderFen = fen -- This would need move application logic
+        state.currentAnalysisId = tostring(tick())
         
         spawn(function()
             local response = request({
@@ -54,24 +48,17 @@ function M.start(modules)
                 },
                 Body = game:GetService("HttpService"):JSONEncode({
                     fen = fen,
-                    move = expectedMove
+                    move = expectedMove,
+                    id = state.currentAnalysisId
                 })
             })
-            
-            if response.Success then
-                local data = game:GetService("HttpService"):JSONDecode(response.Body)
-                if gui.updateAnalysis then
-                    data.analysis.pondering = true
-                    gui.updateAnalysis(data.analysis)
-                end
-            end
         end)
     end
 
-    -- Stop pondering
     local function stopPonder()
         if isPondering then
             isPondering = false
+            state.currentAnalysisId = nil
             request({
                 Url = STOCKFISH_URL .. "/stop",
                 Method = "POST"
@@ -79,10 +66,10 @@ function M.start(modules)
         end
     end
 
-    -- Get best move from Stockfish server with analysis
     local function getStockfishMove(fen, whiteTime, blackTime, whiteToMove, usePonder)
-        stopPonder() -- Stop any ongoing ponder
+        stopPonder()
         
+        state.currentAnalysisId = tostring(tick())
         local endpoint = usePonder and "/ponderhit" or "/analyze"
         local response = request({
             Url = STOCKFISH_URL .. endpoint,
@@ -94,22 +81,14 @@ function M.start(modules)
                 fen = fen,
                 wtime = whiteTime,
                 btime = blackTime,
-                movestogo = 40
+                movestogo = 40,
+                id = state.currentAnalysisId
             })
         })
 
         if response.Success then
             local data = game:GetService("HttpService"):JSONDecode(response.Body)
-            
-            -- Update GUI with analysis data
-            if data.analysis and gui.updateAnalysis then
-                data.analysis.pondering = false
-                gui.updateAnalysis(data.analysis)
-            end
-            
-            -- Store ponder move if available
             ponderMove = data.ponder
-            
             return data.bestmove
         else
             warn("Stockfish request failed:", response.StatusCode, response.Body)
@@ -147,7 +126,6 @@ function M.start(modules)
         return PlayMove
     end
 
-    -- Main part
     local function startGameHandler(board)
         local PlayMove = initializeFunctions()
         local boardLoaded = false
@@ -160,7 +138,6 @@ function M.start(modules)
         local whiteTimeLabel = clockGUI:WaitForChild("WhiteTime")
         local blackTimeLabel = clockGUI:WaitForChild("BlackTime")
 
-        -- wait for clock to initialize
         task.wait(0.1)
         boardLoaded = true
 
@@ -169,24 +146,20 @@ function M.start(modules)
             return isLocalWhite == board.WhiteToPlay.Value
         end
 
-        -- Game loop
         local function gameLoop()
-            task.wait(1) -- minimal game initialization time
+            task.wait(1)
 
             while not gameEnded do
                 if boardLoaded and board then
                     Fen = board.FEN.Value
                     
-                    -- Check if position changed (opponent moved)
                     if Fen ~= lastPosition then
                         lastPosition = Fen
                         
                         if isLocalPlayersTurn() and state.aiRunning then 
-                            -- Our turn - make a move
                             local whiteTime = parseTimeControl(whiteTimeLabel.ContentText)
                             local blackTime = parseTimeControl(blackTimeLabel.ContentText)
                             
-                            -- Check if we predicted this position
                             local usePonder = isPondering and ponderMove
                             
                             local success, result = pcall(function()
@@ -197,7 +170,6 @@ function M.start(modules)
                                 move = result
                                 PlayMove(move)
                                 
-                                -- Start pondering for opponent's move
                                 if ponderMove then
                                     startPonder(Fen, ponderMove)
                                 end
@@ -205,11 +177,10 @@ function M.start(modules)
                                 warn("Error getting move:", result)
                             end
                         elseif not isLocalPlayersTurn() and state.aiRunning then
-                            -- Opponent's turn - start pondering
                             spawn(function()
-                                wait(0.5) -- Small delay to ensure position is stable
+                                wait(0.5)
                                 if not isLocalPlayersTurn() then
-                                    -- Get a preliminary analysis
+                                    state.currentAnalysisId = tostring(tick())
                                     local response = request({
                                         Url = STOCKFISH_URL .. "/quickanalysis",
                                         Method = "POST",
@@ -218,7 +189,8 @@ function M.start(modules)
                                         },
                                         Body = game:GetService("HttpService"):JSONEncode({
                                             fen = Fen,
-                                            depth = 10
+                                            depth = 10,
+                                            id = state.currentAnalysisId
                                         })
                                     })
                                     
@@ -233,7 +205,7 @@ function M.start(modules)
                         end
                     end
                 end
-                task.wait(0.1) -- Minimal loop delay
+                task.wait(0.1)
             end
         end
 
@@ -244,11 +216,11 @@ function M.start(modules)
                 gameEnded = true
                 state.gameConnected = false
                 stopPonder()
+                state.currentAnalysisId = nil
                 print("[LOG]: Game ended.")
         end)
     end
 
-    -- Listener to get the board object
     if not state.gameConnected then
         ReplicatedStorage.Chess:WaitForChild("StartGameEvent").OnClientEvent:Connect(function(board)
             if board then
