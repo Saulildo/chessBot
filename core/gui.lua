@@ -8,6 +8,7 @@ function M.init(modules)
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local UserInputService = game:GetService("UserInputService")
     
     -- Create main GUI
     local screenGui = Instance.new("ScreenGui")
@@ -23,6 +24,11 @@ function M.init(modules)
     toggleButton.BorderSizePixel = 0
     toggleButton.Text = ""
     toggleButton.Parent = screenGui
+    
+    -- Add UICorner for rounded edges
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.Parent = toggleButton
     
     local icon = Instance.new("ImageLabel")
     icon.Size = UDim2.new(0.7, 0, 0.7, 0)
@@ -41,6 +47,10 @@ function M.init(modules)
     analysisPanel.Visible = false
     analysisPanel.Parent = screenGui
     
+    local panelCorner = Instance.new("UICorner")
+    panelCorner.CornerRadius = UDim.new(0, 8)
+    panelCorner.Parent = analysisPanel
+    
     -- Panel header
     local header = Instance.new("TextLabel")
     header.Size = UDim2.new(1, 0, 0, 30)
@@ -58,6 +68,18 @@ function M.init(modules)
     dataContainer.Position = UDim2.new(0, 5, 0, 35)
     dataContainer.BackgroundTransparency = 1
     dataContainer.Parent = analysisPanel
+    
+    -- Pondering indicator
+    local ponderingLabel = Instance.new("TextLabel")
+    ponderingLabel.Size = UDim2.new(0.3, 0, 0, 20)
+    ponderingLabel.Position = UDim2.new(0.7, 0, 0, 5)
+    ponderingLabel.BackgroundTransparency = 1
+    ponderingLabel.Text = "PONDER"
+    ponderingLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    ponderingLabel.TextScaled = true
+    ponderingLabel.Font = Enum.Font.SourceSansBold
+    ponderingLabel.Visible = false
+    ponderingLabel.Parent = header
     
     -- Create analysis labels
     local function createAnalysisRow(yPosition, labelText)
@@ -137,10 +159,13 @@ function M.init(modules)
             end
             npsLabel.Text = npsText
         end
+        
+        -- Show/hide pondering indicator
+        ponderingLabel.Visible = data.pondering or false
     end
     
     -- Toggle functionality
-    toggleButton.MouseButton1Click:Connect(function()
+    local function toggleAI()
         state.aiRunning = not state.aiRunning
         
         if state.aiRunning then
@@ -156,38 +181,58 @@ function M.init(modules)
             icon.ImageColor3 = config.COLORS.off.icon
             analysisPanel.Visible = false
         end
-    end)
+    end
     
-    -- Make panel draggable
+    toggleButton.MouseButton1Click:Connect(toggleAI)
+
+    toggleButton.TouchTap:Connect(toggleAI)
+
     local dragging = false
     local dragStart = nil
     local startPos = nil
+    local dragInput = nil
+    
+    local function updateDrag(input)
+        if not dragging then return end
+        
+        local delta = input.Position - dragStart
+        analysisPanel.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
     
     header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = analysisPanel.Position
+            
+            dragInput = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    if dragInput then
+                        dragInput:Disconnect()
+                        dragInput = nil
+                    end
+                end
+            end)
         end
     end)
     
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            analysisPanel.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            updateDrag(input)
         end
     end)
     
-    game:GetService("UserInputService").InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
+    -- Export the GUI module
+    M.screenGui = screenGui
+    M.ponderingLabel = ponderingLabel
 end
 
 return M
