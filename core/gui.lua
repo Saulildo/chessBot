@@ -73,7 +73,7 @@ function M.init(modules)
     
     local ponderIndicator = Instance.new("Frame")
     ponderIndicator.Size = UDim2.new(0, 60, 0, 20)
-    ponderIndicator.Position = UDim2.new(0.65, 0, 0.5, -10)
+    ponderIndicator.Position = UDim2.new(0, 135, 0.5, -10)
     ponderIndicator.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     ponderIndicator.BorderSizePixel = 0
     ponderIndicator.Visible = false
@@ -91,6 +91,17 @@ function M.init(modules)
     ponderText.Font = Enum.Font.SourceSansBold
     ponderText.TextSize = 12
     ponderText.Parent = ponderIndicator
+    
+    local minimizeButton = Instance.new("TextButton")
+    minimizeButton.Size = UDim2.new(0, 20, 0, 20)
+    minimizeButton.Position = UDim2.new(0, 200, 0.5, -10)
+    minimizeButton.BackgroundTransparency = 1
+    minimizeButton.Text = "—"
+    minimizeButton.TextColor3 = Color3.fromRGB(180, 180, 180)
+    minimizeButton.Font = Enum.Font.SourceSansBold
+    minimizeButton.TextSize = 16
+    minimizeButton.AutoButtonColor = false
+    minimizeButton.Parent = headerFrame
     
     local toggleButton = Instance.new("TextButton")
     toggleButton.Size = UDim2.new(0, 60, 0, 26)
@@ -156,34 +167,21 @@ function M.init(modules)
     local nodesValue, nodesRow = createDataRow(2, "Nodes")
     local speedValue, speedRow = createDataRow(3, "Speed")
     
-    local minimizeButton = Instance.new("TextButton")
-    minimizeButton.Size = UDim2.new(0, 20, 0, 20)
-    minimizeButton.Position = UDim2.new(1, -25, 0.5, -10)
-    minimizeButton.BackgroundTransparency = 1
-    minimizeButton.Text = "—"
-    minimizeButton.TextColor3 = Color3.fromRGB(180, 180, 180)
-    minimizeButton.Font = Enum.Font.SourceSansBold
-    minimizeButton.TextSize = 16
-    minimizeButton.AutoButtonColor = false
-    minimizeButton.Parent = headerFrame
-    
     local isMinimized = false
     local normalSize = mainFrame.Size
     local minimizedSize = UDim2.new(0, 300, 0, 40)
     
-    minimizeButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
-            isMinimized = not isMinimized
-            local targetSize = isMinimized and minimizedSize or normalSize
-            
-            local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                Size = targetSize
-            })
-            tween:Play()
-            
-            minimizeButton.Text = isMinimized and "+" or "—"
-        end
+    minimizeButton.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        local targetSize = isMinimized and minimizedSize or normalSize
+        
+        local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Size = targetSize
+        })
+        tween:Play()
+        
+        minimizeButton.Text = isMinimized and "+" or "—"
+        contentFrame.Visible = not isMinimized
     end)
     
     function M.updateAnalysis(data)
@@ -281,11 +279,8 @@ function M.init(modules)
         end)
     end
     
-    toggleButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
-            setEngineState(not state.aiRunning)
-        end
+    toggleButton.MouseButton1Click:Connect(function()
+        setEngineState(not state.aiRunning)
     end)
     
     local dragging = false
@@ -331,7 +326,7 @@ function M.init(modules)
         end
     end)
     
-    spawn(function()
+    task.spawn(function()
         while true do
             if state.aiRunning and state.currentAnalysisId then
                 local response = request({
@@ -346,7 +341,7 @@ function M.init(modules)
                     end
                 end
             end
-            wait(0.1)
+            task.wait(0.1)
         end
     end)
     
