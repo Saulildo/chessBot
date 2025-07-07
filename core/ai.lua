@@ -52,6 +52,13 @@ function M.start(modules)
                     id = state.currentAnalysisId
                 })
             })
+            
+            if response.Success then
+                local data = game:GetService("HttpService"):JSONDecode(response.Body)
+                if data.analysis and gui.updateAnalysis then
+                    gui.updateAnalysis(data.analysis)
+                end
+            end
         end)
     end
 
@@ -88,6 +95,12 @@ function M.start(modules)
 
         if response.Success then
             local data = game:GetService("HttpService"):JSONDecode(response.Body)
+            
+            -- Update GUI with analysis data
+            if data.analysis and gui.updateAnalysis then
+                gui.updateAnalysis(data.analysis)
+            end
+            
             ponderMove = data.ponder
             return data.bestmove
         else
