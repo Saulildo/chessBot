@@ -160,67 +160,72 @@ function M.start(modules)
         end
 
         local function gameLoop()
-            task.wait(1)
+    task.wait(1)
 
-            while not gameEnded do
-                if boardLoaded and board then
-                    Fen = board.FEN.Value
+    local wasRunning = state.aiRunning
+
+    while not gameEnded do
+        if boardLoaded and board then
+            Fen = board.FEN.Value
+            
+            local justEnabled = state.aiRunning and not wasRunning
+            wasRunning = state.aiRunning
+        
+            if Fen ~= lastPosition or justEnabled then
+                lastPosition = Fen
+                
+                if isLocalPlayersTurn() and state.aiRunning then 
+                    local whiteTime = parseTimeControl(whiteTimeLabel.ContentText)
+                    local blackTime = parseTimeControl(blackTimeLabel.ContentText)
                     
-                    if Fen ~= lastPosition then
-                        lastPosition = Fen
+                    local usePonder = isPondering and ponderMove
+                    
+                    local success, result = pcall(function()
+                        return getStockfishMove(Fen, whiteTime, blackTime, board.WhiteToPlay.Value, usePonder)
+                    end)
+                    
+                    if success and result then
+                        move = result
+                        PlayMove(move)
                         
-                        if isLocalPlayersTurn() and state.aiRunning then 
-                            local whiteTime = parseTimeControl(whiteTimeLabel.ContentText)
-                            local blackTime = parseTimeControl(blackTimeLabel.ContentText)
-                            
-                            local usePonder = isPondering and ponderMove
-                            
-                            local success, result = pcall(function()
-                                return getStockfishMove(Fen, whiteTime, blackTime, board.WhiteToPlay.Value, usePonder)
-                            end)
-                            
-                            if success and result then
-                                move = result
-                                PlayMove(move)
-                                
-                                if ponderMove then
-                                    startPonder(Fen, ponderMove)
-                                end
-                            elseif not success then
-                                warn("Error getting move:", result)
-                            end
-                        elseif not isLocalPlayersTurn() and state.aiRunning then
-                            spawn(function()
-                                wait(0.5)
-                                if not isLocalPlayersTurn() then
-                                    state.currentAnalysisId = tostring(tick())
-                                    local response = request({
-                                        Url = STOCKFISH_URL .. "/quickanalysis",
-                                        Method = "POST",
-                                        Headers = {
-                                            ["Content-Type"] = "application/json"
-                                        },
-                                        Body = game:GetService("HttpService"):JSONEncode({
-                                            fen = Fen,
-                                            depth = 10,
-                                            id = state.currentAnalysisId
-                                        })
-                                    })
-                                    
-                                    if response.Success then
-                                        local data = game:GetService("HttpService"):JSONDecode(response.Body)
-                                        if data.bestmove then
-                                            startPonder(Fen, data.bestmove)
-                                        end
-                                    end
-                                end
-                            end)
+                        if ponderMove then
+                            startPonder(Fen, ponderMove)
                         end
+                    elseif not success then
+                        warn("Error getting move:", result)
                     end
+                elseif not isLocalPlayersTurn() and state.aiRunning then
+                    spawn(function()
+                        wait(0.5)
+                        if not isLocalPlayersTurn() then
+                            state.currentAnalysisId = tostring(tick())
+                            local response = request({
+                                Url = STOCKFISH_URL .. "/quickanalysis",
+                                Method = "POST",
+                                Headers = {
+                                    ["Content-Type"] = "application/json"
+                                },
+                                Body = game:GetService("HttpService"):JSONEncode({
+                                    fen = Fen,
+                                    depth = 10,
+                                    id = state.currentAnalysisId
+                                })
+                            })
+                            
+                            if response.Success then
+                                local data = game:GetService("HttpService"):JSONDecode(response.Body)
+                                if data.bestmove then
+                                    startPonder(Fen, data.bestmove)
+                                end
+                            end
+                        end
+                    end)
                 end
-                task.wait(0.1)
             end
         end
+        task.wait(0.1)
+    end
+end
 
         state.aiThread = coroutine.create(gameLoop)
         coroutine.resume(state.aiThread)
