@@ -3,6 +3,7 @@ local M = {}
 function M.start(modules)
     local config = modules.config
     local state = modules.state
+    local gui = modules.gui
 
     -- Start new instance
     state.aiLoaded = true
@@ -30,10 +31,10 @@ function M.start(modules)
         return 180000 -- Default 3 minutes
     end
 
-    -- Get best move from Stockfish server with time management
+    -- Get best move from Stockfish server with analysis
     local function getStockfishMove(fen, whiteTime, blackTime, whiteToMove)
         local response = request({
-            Url = STOCKFISH_URL .. "/bestmove",
+            Url = STOCKFISH_URL .. "/analyze",
             Method = "POST",
             Headers = {
                 ["Content-Type"] = "application/json"
@@ -42,12 +43,18 @@ function M.start(modules)
                 fen = fen,
                 wtime = whiteTime,
                 btime = blackTime,
-                movestogo = 40 -- Assume 40 moves to time control
+                movestogo = 40
             })
         })
 
         if response.Success then
             local data = game:GetService("HttpService"):JSONDecode(response.Body)
+            
+            -- Update GUI with analysis data
+            if data.analysis and gui.updateAnalysis then
+                gui.updateAnalysis(data.analysis)
+            end
+            
             return data.bestmove
         else
             warn("Stockfish request failed:", response.StatusCode, response.Body)
