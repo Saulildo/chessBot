@@ -327,35 +327,23 @@ function M.init(modules)
     end)
     
     task.spawn(function()
-    local lastStatusUpdate = 0
-    local STATUS_UPDATE_INTERVAL = 0.5 -- Increased from 0.1 to 0.5 seconds
-    
-    while true do
-        local currentTime = tick()
-        
-        if state.aiRunning and state.currentAnalysisId and (currentTime - lastStatusUpdate >= STATUS_UPDATE_INTERVAL) then
-            lastStatusUpdate = currentTime
-            
-            spawn(function() -- Make status check async
-                local success, response = pcall(function()
-                    return request({
-                        Url = "http://localhost:8080/status",
-                        Method = "GET"
-                    })
-                end)
+        while true do
+            if state.aiRunning and state.currentAnalysisId then
+                local response = request({
+                    Url = "http://localhost:8080/status",
+                    Method = "GET"
+                })
                 
-                if success and response and response.Success then
+                if response.Success then
                     local data = game:GetService("HttpService"):JSONDecode(response.Body)
                     if data.analysis then
                         M.updateAnalysis(data.analysis)
                     end
                 end
-            end)
+            end
+            task.wait(0.1)
         end
-        
-        task.wait(STATUS_UPDATE_INTERVAL)
-    end
-end)
+    end)
     
     M.screenGui = screenGui
 end
