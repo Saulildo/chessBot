@@ -6,7 +6,15 @@ local HttpService = cloneref(game:GetService("HttpService"))
 function M.start(modules)
     local config = modules.config
     local state = modules.state
-    
+
+    local ENGINE_CONFIG = config.ENGINE or {
+        THREADS = 5,
+        CONTEMPT = 100,
+        HASH = 128,
+        PONDER_DEPTH = 12,
+        MOVES_TO_GO = 40
+    }
+
     state.aiLoaded = true
     state.gameConnected = false
 
