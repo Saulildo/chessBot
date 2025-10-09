@@ -1,24 +1,27 @@
 local M = {}
 
+local cloneref = cloneref or function(obj) return obj end
+local Players = cloneref(game:GetService("Players"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
+local TweenService = cloneref(game:GetService("TweenService"))
+local HttpService = cloneref(game:GetService("HttpService"))
+local CoreGui = cloneref(game:GetService("CoreGui"))
+
 function M.init(modules)
     local config = modules.config
     local state = modules.state
     local ai = modules.ai
     
-    local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    local UserInputService = game:GetService("UserInputService")
-    local TweenService = game:GetService("TweenService")
     
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "ChessAIGui"
+    screenGui.Name = "ChessAICoreGui"
     screenGui.ResetOnSpawn = false
-    screenGui.Parent = PlayerGui
+    screenGui.Parent = CoreGui
     
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 300, 0, 200)
-    mainFrame.Position = UDim2.new(0.02, 0, 0.5, -100)
+    mainFrame.Size = UDim2.new(0, 320, 0, 240)
+    mainFrame.Position = UDim2.new(0.02, 0, 0.5, -120)
     mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
@@ -50,7 +53,7 @@ function M.init(modules)
     headerCover.Parent = headerFrame
     
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    titleLabel.Size = UDim2.new(0.4, 0, 1, 0)
     titleLabel.Position = UDim2.new(0, 15, 0, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = "Stockfish Engine"
@@ -62,7 +65,7 @@ function M.init(modules)
     
     local statusDot = Instance.new("Frame")
     statusDot.Size = UDim2.new(0, 10, 0, 10)
-    statusDot.Position = UDim2.new(0, 260, 0.5, -5)
+    statusDot.Position = UDim2.new(1, -70, 0.5, -5)
     statusDot.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
     statusDot.BorderSizePixel = 0
     statusDot.Parent = headerFrame
@@ -71,47 +74,15 @@ function M.init(modules)
     dotCorner.CornerRadius = UDim.new(0.5, 0)
     dotCorner.Parent = statusDot
     
-    local ponderIndicator = Instance.new("Frame")
-    ponderIndicator.Size = UDim2.new(0, 60, 0, 20)
-    ponderIndicator.Position = UDim2.new(0, 135, 0.5, -10)
-    ponderIndicator.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    ponderIndicator.BorderSizePixel = 0
-    ponderIndicator.Visible = false
-    ponderIndicator.Parent = headerFrame
-    
-    local ponderCorner = Instance.new("UICorner")
-    ponderCorner.CornerRadius = UDim.new(0, 4)
-    ponderCorner.Parent = ponderIndicator
-    
-    local ponderText = Instance.new("TextLabel")
-    ponderText.Size = UDim2.new(1, 0, 1, 0)
-    ponderText.BackgroundTransparency = 1
-    ponderText.Text = "PONDER"
-    ponderText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ponderText.Font = Enum.Font.SourceSansBold
-    ponderText.TextSize = 12
-    ponderText.Parent = ponderIndicator
-    
-    local minimizeButton = Instance.new("TextButton")
-    minimizeButton.Size = UDim2.new(0, 20, 0, 20)
-    minimizeButton.Position = UDim2.new(0, 200, 0.5, -10)
-    minimizeButton.BackgroundTransparency = 1
-    minimizeButton.Text = "—"
-    minimizeButton.TextColor3 = Color3.fromRGB(180, 180, 180)
-    minimizeButton.Font = Enum.Font.SourceSansBold
-    minimizeButton.TextSize = 16
-    minimizeButton.AutoButtonColor = false
-    minimizeButton.Parent = headerFrame
-    
     local toggleButton = Instance.new("TextButton")
-    toggleButton.Size = UDim2.new(0, 60, 0, 26)
-    toggleButton.Position = UDim2.new(0, 225, 0.5, -13)
+    toggleButton.Size = UDim2.new(0, 50, 0, 24)
+    toggleButton.Position = UDim2.new(1, -55, 0.5, -12)
     toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     toggleButton.BorderSizePixel = 0
     toggleButton.Text = "OFF"
     toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     toggleButton.Font = Enum.Font.SourceSansBold
-    toggleButton.TextSize = 14
+    toggleButton.TextSize = 13
     toggleButton.AutoButtonColor = false
     toggleButton.Parent = headerFrame
     
@@ -120,15 +91,15 @@ function M.init(modules)
     toggleCorner.Parent = toggleButton
     
     local contentFrame = Instance.new("Frame")
-    contentFrame.Size = UDim2.new(1, -20, 1, -50)
+    contentFrame.Size = UDim2.new(1, -20, 1, -90)
     contentFrame.Position = UDim2.new(0, 10, 0, 45)
     contentFrame.BackgroundTransparency = 1
     contentFrame.Parent = mainFrame
     
     local function createDataRow(position, label)
         local rowFrame = Instance.new("Frame")
-        rowFrame.Size = UDim2.new(1, 0, 0, 35)
-        rowFrame.Position = UDim2.new(0, 0, 0, position * 37)
+        rowFrame.Size = UDim2.new(1, 0, 0, 32)
+        rowFrame.Position = UDim2.new(0, 0, 0, position * 34)
         rowFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         rowFrame.BorderSizePixel = 0
         rowFrame.Parent = contentFrame
@@ -139,7 +110,7 @@ function M.init(modules)
         
         local labelText = Instance.new("TextLabel")
         labelText.Size = UDim2.new(0, 80, 1, 0)
-        labelText.Position = UDim2.new(0, 15, 0, 0)
+        labelText.Position = UDim2.new(0, 12, 0, 0)
         labelText.BackgroundTransparency = 1
         labelText.Text = label
         labelText.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -149,8 +120,8 @@ function M.init(modules)
         labelText.Parent = rowFrame
         
         local valueText = Instance.new("TextLabel")
-        valueText.Size = UDim2.new(0, 120, 1, 0)
-        valueText.Position = UDim2.new(1, -135, 0, 0)
+        valueText.Size = UDim2.new(0, 140, 1, 0)
+        valueText.Position = UDim2.new(1, -152, 0, 0)
         valueText.BackgroundTransparency = 1
         valueText.Text = "---"
         valueText.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -159,30 +130,51 @@ function M.init(modules)
         valueText.TextSize = 14
         valueText.Parent = rowFrame
         
-        return valueText, rowFrame
+        return valueText
     end
     
-    local depthValue, depthRow = createDataRow(0, "Depth")
-    local scoreValue, scoreRow = createDataRow(1, "Score")
-    local nodesValue, nodesRow = createDataRow(2, "Nodes")
-    local speedValue, speedRow = createDataRow(3, "Speed")
+    local depthValue = createDataRow(0, "Depth")
+    local scoreValue = createDataRow(1, "Score")
+    local nodesValue = createDataRow(2, "Nodes")
+    local speedValue = createDataRow(3, "Speed")
     
-    local isMinimized = false
-    local normalSize = mainFrame.Size
-    local minimizedSize = UDim2.new(0, 300, 0, 40)
+    local controlFrame = Instance.new("Frame")
+    controlFrame.Size = UDim2.new(1, -20, 0, 40)
+    controlFrame.Position = UDim2.new(0, 10, 1, -45)
+    controlFrame.BackgroundTransparency = 1
+    controlFrame.Parent = mainFrame
     
-    minimizeButton.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        local targetSize = isMinimized and minimizedSize or normalSize
-        
-        local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-            Size = targetSize
-        })
-        tween:Play()
-        
-        minimizeButton.Text = isMinimized and "+" or "—"
-        contentFrame.Visible = not isMinimized
-    end)
+    local autoMoveButton = Instance.new("TextButton")
+    autoMoveButton.Size = UDim2.new(0.48, 0, 1, 0)
+    autoMoveButton.Position = UDim2.new(0, 0, 0, 0)
+    autoMoveButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    autoMoveButton.BorderSizePixel = 0
+    autoMoveButton.Text = "AUTO MOVE"
+    autoMoveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    autoMoveButton.Font = Enum.Font.SourceSansBold
+    autoMoveButton.TextSize = 14
+    autoMoveButton.AutoButtonColor = false
+    autoMoveButton.Parent = controlFrame
+    
+    local autoCorner = Instance.new("UICorner")
+    autoCorner.CornerRadius = UDim.new(0, 8)
+    autoCorner.Parent = autoMoveButton
+    
+    local forceMoveButton = Instance.new("TextButton")
+    forceMoveButton.Size = UDim2.new(0.48, 0, 1, 0)
+    forceMoveButton.Position = UDim2.new(0.52, 0, 0, 0)
+    forceMoveButton.BackgroundColor3 = Color3.fromRGB(70, 130, 220)
+    forceMoveButton.BorderSizePixel = 0
+    forceMoveButton.Text = "FORCE MOVE"
+    forceMoveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    forceMoveButton.Font = Enum.Font.SourceSansBold
+    forceMoveButton.TextSize = 14
+    forceMoveButton.AutoButtonColor = false
+    forceMoveButton.Parent = controlFrame
+    
+    local forceCorner = Instance.new("UICorner")
+    forceCorner.CornerRadius = UDim.new(0, 8)
+    forceCorner.Parent = forceMoveButton
     
     function M.updateAnalysis(data)
         if data.depth then
@@ -235,16 +227,14 @@ function M.init(modules)
         if data.nps then
             local npsText
             if data.nps >= 1e6 then
-                npsText = string.format("%.1fM nps", data.nps / 1e6)
+                npsText = string.format("%.1fM/s", data.nps / 1e6)
             elseif data.nps >= 1e3 then
-                npsText = string.format("%.0fK nps", data.nps / 1e3)
+                npsText = string.format("%.0fK/s", data.nps / 1e3)
             else
-                npsText = tostring(data.nps) .. " nps"
+                npsText = tostring(data.nps) .. "/s"
             end
             speedValue.Text = npsText
         end
-        
-        ponderIndicator.Visible = data.pondering or false
     end
     
     local function setEngineState(enabled)
@@ -262,35 +252,51 @@ function M.init(modules)
             toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
             toggleButton.Text = "OFF"
             statusDot.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-            ponderIndicator.Visible = false
         end
         
-        local pulseTween = TweenService:Create(statusDot, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+        TweenService:Create(statusDot, TweenInfo.new(0.3), {
             Size = UDim2.new(0, 14, 0, 14),
-            Position = UDim2.new(0, 258, 0.5, -7)
-        })
-        pulseTween:Play()
-        pulseTween.Completed:Connect(function()
-            local returnTween = TweenService:Create(statusDot, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                Size = UDim2.new(0, 10, 0, 10),
-                Position = UDim2.new(0, 260, 0.5, -5)
-            })
-            returnTween:Play()
-        end)
+            Position = UDim2.new(1, -72, 0.5, -7)
+        }):Play()
+        task.wait(0.3)
+        TweenService:Create(statusDot, TweenInfo.new(0.3), {
+            Size = UDim2.new(0, 10, 0, 10),
+            Position = UDim2.new(1, -70, 0.5, -5)
+        }):Play()
+    end
+    
+    local function setAutoMove(enabled)
+        state.autoMove = enabled
+        
+        if enabled then
+            autoMoveButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+            autoMoveButton.Text = "AUTO MOVE"
+        else
+            autoMoveButton.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
+            autoMoveButton.Text = "ANALYSIS"
+        end
     end
     
     toggleButton.MouseButton1Click:Connect(function()
         setEngineState(not state.aiRunning)
     end)
     
+    autoMoveButton.MouseButton1Click:Connect(function()
+        setAutoMove(not state.autoMove)
+    end)
+    
+    forceMoveButton.MouseButton1Click:Connect(function()
+        if state.aiRunning and state.bestMove then
+            ai.playMove()
+        end
+    end)
+    
     local dragging = false
     local dragStart = nil
     local startPos = nil
-    local dragInput = nil
     
     local function updateDrag(input)
         if not dragging then return end
-        
         local delta = input.Position - dragStart
         mainFrame.Position = UDim2.new(
             startPos.X.Scale,
@@ -307,13 +313,9 @@ function M.init(modules)
             dragStart = input.Position
             startPos = mainFrame.Position
             
-            dragInput = input.Changed:Connect(function()
+            input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
-                    if dragInput then
-                        dragInput:Disconnect()
-                        dragInput = nil
-                    end
                 end
             end)
         end
@@ -329,13 +331,15 @@ function M.init(modules)
     task.spawn(function()
         while true do
             if state.aiRunning and state.currentAnalysisId then
-                local response = request({
-                    Url = "http://localhost:8080/status",
-                    Method = "GET"
-                })
+                local success, response = pcall(function()
+                    return request({
+                        Url = config.STOCKFISH_URL .. "/status",
+                        Method = "GET"
+                    })
+                end)
                 
-                if response.Success then
-                    local data = game:GetService("HttpService"):JSONDecode(response.Body)
+                if success and response.Success then
+                    local data = HttpService:JSONDecode(response.Body)
                     if data.analysis then
                         M.updateAnalysis(data.analysis)
                     end
